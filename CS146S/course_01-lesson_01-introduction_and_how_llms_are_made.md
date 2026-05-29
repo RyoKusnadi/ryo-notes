@@ -17,6 +17,8 @@ Software development has transitioned from **0→1 code creation** to an **itera
 - **Hallucination risk**: AI-generated code requires rigorous validation before deployment
 - **Cost complexity**: Reasoning tokens can cost 10–100× more than standard inference
 - **Context management**: Poor context curation leads to degraded output quality ("context rot")
+- **Language bias**: Models perform significantly better on languages with abundant training data (Python, TypeScript/JavaScript) vs. underrepresented languages (Swift, niche frameworks).
+
 
 #### Opportunities
 - **Unprecedented productivity**: Engineers using modern AI tooling ship features 10–100× faster
@@ -32,12 +34,12 @@ Software development has transitioned from **0→1 code creation** to an **itera
 
 This is **not** the "vibe coding" class. We focus on deliberate, high-leverage engineering practices.
 
-| Principle | Technical Meaning | Why It Matters in 2026 |
-|-----------|------------------|------------------------|
-| **Human-Agent Engineering** | Focus on skills AI hasn't mastered: business context, architectural judgment, stakeholder alignment, system design | Positions you as the orchestrator/tech lead, not just a prompter or code reviewer |
-| **Context = Quality** | "Good context leads to good code. If you can't understand your codebase, neither will an LLM." | LLMs mirror your input. Context engineering—curating the right information—is now a core engineering skill |
-| **Develop "Taste"** | Read and review massive amounts of code. Learn to instantly spot clean, maintainable, correct implementations vs. fragile or wrong ones | You are the quality gatekeeper when AI generates at scale. Taste is your defensible, non-automatable skill |
-| **Experiment Aggressively** | No established AI dev patterns exist yet. Everyone is iterating in real-time. | Treat tools, prompts, and workflows as hypotheses. Test, measure, and adopt what works for your context |
+| Principle | Technical Meaning | Why It Matters in 2026 | Insight |
+|-----------|------------------|------------------------|------------------------|
+| **Human-Agent Engineering** | Focus on skills AI hasn't mastered: business context, architectural judgment, stakeholder alignment, system design | Positions you as the orchestrator/tech lead, not just a prompter or code reviewer | If you can't explain your requirement clearly to a human, why expect an LLM to understand? |
+| **Context = Quality** | "Good context leads to good code. If you can't understand your codebase, neither will an LLM." | LLMs mirror your input. Context engineering—curating the right information—is now a core engineering skill | The model's output quality is bounded by your ability to frame the problem |
+| **Develop "Taste"** | Read and review massive amounts of code. Learn to instantly spot clean, maintainable, correct implementations vs. fragile or wrong ones | You are the quality gatekeeper when AI generates at scale. Taste is your defensible, non-automatable skill | 🤔 Open question: How do new engineers build "taste" when AI writes most of their code? This course aims to address that gap|
+| **Experiment Aggressively** | No established AI dev patterns exist yet. Everyone is iterating in real-time. | Treat tools, prompts, and workflows as hypotheses. Test, measure, and adopt what works for your context | Find a workflow that suits you—there's no universal right answer yet|
 
 ---
 
@@ -60,8 +62,9 @@ Probability Distribution (softmax over vocab for next token)
 Sampling (temperature/top-p control randomness; greedy/beam for deterministic)
 ↓
 Append token to context → Repeat until stop condition
-
 ```
+>🔍 Key Insight: Everything is probability. Even "thinking models" aren't reasoning—they're leveraging richer context and attention patterns to produce more coherent outputs. The model doesn't "know" anything; it predicts what's statistically likely.
+
 
 
 ### 🚀 Key Architecture Innovations
@@ -121,6 +124,8 @@ Example:
 Prompt: "Write a for loop"
 Output: "that could be used in a piece of code" (continuation, not instruction-following)
 ```
+> 🎓 Critical Distinction: A raw pre-trained/base model does not follow instructions. It simply continues text patterns. If you prompt it without instruction-tuning, you'll get completions, not answers.
+
 
 ### Stage 2: Supervised Fine-Tuning (SFT)
 ```
@@ -135,6 +140,7 @@ Example:
 Prompt: "Write a for loop in Python that prints 0–9"
 Output: "for i in range(10): print(i)" (instruction-following)
 ```
+> 🔑 Model Naming Convention: Look for suffixes like -instruct, -chat, or -thinking to identify fine-tuned variants. Base models lack conversational capability.
 
 ### Stage 3: Preference Tuning
 | Method | Core Idea | Best Use Case | Key Advantage |
@@ -147,6 +153,8 @@ Output: "for i in range(10): print(i)" (instruction-following)
 | **IRPO** | Implicit policy regularization for smoother optimization | Production fine-tuning with limited preference data | Better generalization; less overfitting to preference labels |
 
 > **Modern Pipeline**: SFT → SimPO (broad shaping) → ORPO (handle imbalance) → KTO (risk domains) → DPO/IRPO (final polish)
+
+⚠️ Concern: Models are optimized to earn "thumbs up" ratings. If users rate plausible-but-wrong answers highly, models learn to appear helpful rather than be correct. Please rate thoughtfully—if you lack domain expertise, your feedback may inadvertently train models to be confidently wrong.
 
 ---
 
@@ -183,6 +191,12 @@ Emergent behaviors (not programmed!):
 • Strategy selection: "Direct computation too complex. Find pattern first..."
 ```
 
+### Chain of Thought: From Prompt Technique to Training Data
+- Originally a prompting strategy: "Let's think step by step" to improve reasoning
+- Now baked into training data: Models learn to output reasoning traces because humans rate them higher
+- Reflection: "I worry this trains models to mimic human reasoning patterns rather than develop superior reasoning. If AGI emerges, will it think like us—or differently?"
+
+
 ### Practical Implications for Engineers
 - **Thinking tokens cost money**: One o3 request for a hard problem may use 5K–20K internal tokens
 - **Latency trade-off**: Reasoning models take 15–90s for hard problems vs. 1–3s for standard models
@@ -208,12 +222,12 @@ Distillation beats direct RL on the small model and is far cheaper.
 
 ### ⚠️ Critical Limitations & Engineering Mitigations
 
-| Limitation | Technical Reality (2026) | Practical Mitigation |
-|------------|--------------------------|---------------------|
-| **Hallucinations** | Generates non-existent/deprecated APIs; logic errors in novel domains | • Context engineering: Provide exact API docs, type signatures<br>• RAG + verification: Retrieve authoritative docs; ask model to cite sources<br>• Tool-use integration: Let model call APIs/docs at runtime |
-| **Context Window Limits** | ~128K–1M tokens capacity, but attention isn't uniform | • Strategic context slicing: Send only relevant files, use RAG<br>• PagedAttention / Streaming KV: Recycle memory blocks<br>• Ring Attention: Distribute context across GPUs |
-| **Latency** | Seconds to minutes per request; reasoning models add 15–90s | • Speculative decoding: Small draft model proposes, large model verifies<br>• QuantSpec: Hierarchical quantized KV cache → 2.5× speedup<br>• Plan & delegate: Break tasks into parallel sub-prompts |
-| **Cost** | $1–3/M input tokens, $10+/M output tokens; reasoning tokens cost 10–100× more | • Token optimization: Cache prompts, strip boilerplate<br>• Model routing: Simple queries → small models; hard tasks → large models<br>• Distillation: Deploy distilled small models for common patterns |
+| Limitation | Technical Reality (2026) | Practical Mitigation | Insight |
+|------------|--------------------------|---------------------|---------------------|
+| **Hallucinations** | Generates non-existent/deprecated APIs; logic errors in novel domains | • Context engineering: Provide exact API docs, type signatures<br>• RAG + verification: Retrieve authoritative docs; ask model to cite sources<br>• Tool-use integration: Let model call APIs/docs at runtime | The model's job isn't to be right—it's to sound human. That's why hallucinations are fundamental, not a bug|
+| **Context Window Limits** | ~128K–1M tokens capacity, but attention isn't uniform | • Strategic context slicing: Send only relevant files, use RAG<br>• PagedAttention / Streaming KV: Recycle memory blocks<br>• Ring Attention: Distribute context across GPUs | When coding, you often need to reference distant parts of a codebase. Humans help by explicitly flagging what to 'remember'|
+| **Latency** | Seconds to minutes per request; reasoning models add 15–90s | • Speculative decoding: Small draft model proposes, large model verifies<br>• QuantSpec: Hierarchical quantized KV cache → 2.5× speedup<br>• Plan & delegate: Break tasks into parallel sub-prompts | I never know if my next prompt will take 1 minute or 30. Workflow design must account for this variance|
+| **Cost** | $1–3/M input tokens, $10+/M output tokens; reasoning tokens cost 10–100× more | • Token optimization: Cache prompts, strip boilerplate<br>• Model routing: Simple queries → small models; hard tasks → large models<br>• Distillation: Deploy distilled small models for common patterns | Always check pricing: some providers (e.g., Gemini) charge equally for input/output; others don't| 
 | **Knowledge Cutoff** | May not know latest libraries/frameworks post-training | • Enable web search tool: Let model retrieve up-to-date docs<br>• Provide docs in context: Attach relevant API references, changelogs<br>• Fine-tune on internal docs: Use LoRA/QLoRA for domain adaptation |
 | **Context Rot** | Performance degrades as context windows grow with poorly curated information | • Active context curation: Continuously validate and prune context<br>• Hierarchical memory: Separate short-term, working, and long-term memory<br>• Adaptive retrieval: Decide *when* to retrieve, not just *what* |
 
@@ -320,6 +334,8 @@ Iteration Loop: Validate → Refine → Ship
 - [ ] Add a "validation step" to your workflow: run linter + tests + SAST before accepting AI output
 - [ ] Start a "prompt journal": log what prompt structures + model selections work for different task types
 - [ ] Explore MCP connectors for your stack: connect your AI agent to databases, APIs, and internal tools
+- [ ] Practice explaining a technical requirement to a human peer before prompting an LLM. If you can't articulate it clearly to a person, refine your thinking first.
+- [ ] When rating AI outputs, ask: "Do I have enough expertise to judge this?" If not, skip rating or flag uncertainty—your feedback shapes model behavior.
 
 ---
 
@@ -331,6 +347,9 @@ The engineers who thrive in 2026+ won't be those who prompt best—they'll be th
 > - **How** to provide the right context (γ-covering, hierarchical memory, adaptive retrieval)
 > - **What** to validate before shipping (security, performance, context citation accuracy)
 > - **Which** architectural patterns to apply (MoE routing, MLA vs. GQA, sliding window)
+> - **Why** "taste" and code review skills remain irreplaceable—even when AI writes the first draft
 
 
 Focus on the skills that aren't yet automated: problem framing, architectural tradeoffs, stakeholder communication, and quality judgment. The tools will keep evolving—your ability to learn, adapt, and lead will not.
+
+>  Reflection: I still enjoy the joy of writing elegant code myself. AI may handle the drafting, but the satisfaction of a clean solution—that's still ours. Don't let automation erase the craft.
